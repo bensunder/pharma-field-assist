@@ -1,0 +1,28 @@
+# One-command local demo:  docker compose up --build   ->  http://localhost:8080
+services:
+  api:
+    build: { context: ./backend, target: runtime }
+    # Live integration settings written by scripts/setup-live-azure.sh (optional: absent = mock mode)
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      PFA_ENVIRONMENT: local
+      PFA_AUTH_MODE: demo
+      PFA_CORS_ORIGINS: '["http://localhost:8080","http://localhost:5173"]'
+      # Uncomment to use a real model (otherwise offline rules + extractive mode):
+      # PFA_AZURE_OPENAI_ENDPOINT: https://<your-aoai>.openai.azure.com
+      # PFA_AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY}
+      # PFA_AZURE_OPENAI_DEPLOYMENT: gpt-4o
+    ports: ["8000:8000"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    volumes: ["audit:/app/var"]
+  web:
+    build: { context: ./frontend }
+    environment:
+      API_UPSTREAM: http://api:8000
+    ports: ["8080:8080"]
+    depends_on: [api]
+volumes:
+  audit: {}

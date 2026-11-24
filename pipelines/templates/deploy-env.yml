@@ -1,0 +1,83 @@
+parameters:
+  - name: envName
+    type: string
+  - name: dependsOn
+    type: string
+  - name: serviceConnection
+    type: string
+  - name: resourceGroup
+    type: string
+  - name: canarySeconds
+    type: number
+
+stages:
+  - stage: Deploy_${{ parameters.envName }}
+    displayName: Deploy ${{ parameters.envName }}
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: succeeded()
+    jobs:
+      - deployment: release
+        # Approvals, business-hours window and exclusive lock are configured on this ADO Environment.
+        environment: pfa-${{ parameters.envName }}
+        pool: { vmImage: ubuntu-latest }
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: AzureCLI@2
+                  displayName: Infra (Bicep) — pinned to the live image
+                  inputs:
+                    azureSubscription: ${{ parameters.serviceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      APP="ca-pfa-${{ parameters.envName }}-api"
+                      LIVE_TAG=$(az containerapp show -g ${{ parameters.resourceGroup }} -n "$APP" \
+                        --query "properties.template.containers[0].image" -o tsv 2>/dev/null | awk -F: '{print $NF}')
+                      # First deploy creates the app with the new image; afterwards Bicep never moves traffic.
+                      export IMAGE_TAG="${LIVE_TAG:-$(imageTag)}"
+                      az deployment group create -g ${{ parameters.resourceGroup }} \
+                        --name "pfa-$(Build.BuildId)" \
+                        --template-file infra/main.bicep \
+                        --parameters infra/main.${{ parameters.envName }}.bicepparam \
+                        -o none
+
+                - task: AzureCLI@2
+                  displayName: Release API revision (blue/green + canary)
+                  inputs:
+                    azureSubscription: ${{ parameters.serviceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      export APPINSIGHTS_APP_ID=$(az monitor app-insights component show -g ${{ parameters.resourceGroup }} \
+                        -a appi-pfa-${{ parameters.envName }} --query appId -o tsv)
+                      export SMOKE_TOKEN=$(az account get-access-token --resource "$(entraAudience_${{ parameters.envName }})" \
+                        --query accessToken -o tsv 2>/dev/null || true)
+                      scripts/aca-release.sh ${{ parameters.resourceGroup }} ca-pfa-${{ parameters.envName }}-api \
+                        $(acrLoginServer)/pfa-api:$(imageTag) ${{ parameters.canarySeconds }}
+
+                - task: AzureCLI@2
+                  displayName: Release web
+                  inputs:
+                    azureSubscription: ${{ parameters.serviceConnection }}
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az containerapp update -g ${{ parameters.resourceGroup }} -n ca-pfa-${{ parameters.envName }}-web \
+                        --image $(acrLoginServer)/pfa-web:$(imageTag) -o none
+
+            on:
+              failure:
+                steps:
+                  - task: AzureCLI@2
+                    displayName: Automatic rollback
+                    inputs:
+                      azureSubscription: ${{ parameters.serviceConnection }}
+                      scriptType: bash
+                      scriptLocation: inlineScript
+                      inlineScript: |
+                        scripts/aca-rollback.sh ${{ parameters.resourceGroup }} ca-pfa-${{ parameters.envName }}-api || true

@@ -1,0 +1,104 @@
+{
+  "version": "2026.11.2",
+  "approved_products": {
+    "cardivex": {
+      "display_name": "Cardivex (velostatin)",
+      "approved_indications": [
+        "primary hyperlipidemia",
+        "mixed dyslipidemia",
+        "ldl-c reduction"
+      ],
+      "approved_population": "adults 18 and older",
+      "isi_doc": "cardivex-isi.md"
+    },
+    "respira": {
+      "display_name": "Respira HFA (tiolanide)",
+      "approved_indications": [
+        "copd maintenance"
+      ],
+      "approved_population": "adults 40 and older with COPD",
+      "isi_doc": "respira-isi.md"
+    }
+  },
+  "off_label_signals": [
+    "off-label",
+    "off label",
+    "pediatric",
+    "children",
+    "child ",
+    "kids",
+    "adolescent",
+    "pregnan",
+    "breastfeed",
+    "weight loss",
+    "heart failure",
+    "asthma",
+    "unapproved",
+    "higher than the label",
+    "double the dose",
+    "not approved for"
+  ],
+  "adverse_event_signals": [
+    "patient experienced",
+    "patient reported",
+    "reaction to",
+    "hospitalized",
+    "er visit",
+    "went to the er",
+    "muscle pain after",
+    "rash after",
+    "rhabdo",
+    "passed out",
+    "anaphyla",
+    "complained of"
+  ],
+  "adverse_event_weak_signals": [
+    "side effect",
+    "adverse event",
+    "adverse reaction",
+    "liver enzymes",
+    "elevated",
+    "muscle pain",
+    "rash",
+    "dizz",
+    "nause"
+  ],
+  "ae_context_signals": [
+    "patient",
+    "he had",
+    "she had",
+    "they had",
+    "developed",
+    "started having",
+    "after starting",
+    "since starting",
+    "my mother",
+    "my father",
+    "reported"
+  ],
+  "prompt_injection_signals": [
+    "ignore previous instructions",
+    "ignore all previous",
+    "disregard your rules",
+    "you are now",
+    "system prompt",
+    "developer mode",
+    "jailbreak",
+    "reveal your instructions"
+  ],
+  "prohibited_claims": [
+    "safest",
+    "best drug",
+    "best in class",
+    "cure",
+    "cures",
+    "guaranteed",
+    "no side effects",
+    "risk-free",
+    "miracle",
+    "better than lipitor",
+    "superior to"
+  ],
+  "ae_reporting_window_hours": 24,
+  "medical_information_contact": "Medical Information: 1-800-555-0142 / medinfo@contoso-pharma.com"
+}

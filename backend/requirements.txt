@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+httpx==0.28.1
+# Fabric SQL endpoint driver (bundles the ODBC driver; Linux needs libltdl7 + krb5 libs, see Dockerfile)
+mssql-python==1.18.0
+PyJWT[crypto]==2.10.1
+# Azure runtime (managed identity -> Azure OpenAI, App Insights)
+azure-identity==1.19.0
+azure-monitor-opentelemetry==1.6.4

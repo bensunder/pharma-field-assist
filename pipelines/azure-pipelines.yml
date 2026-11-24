@@ -1,0 +1,127 @@
+# PharmaFieldAssist — CI/CD (Azure DevOps)
+#
+#  PR  ─► Validate (lint, typecheck, unit/API tests, bicep build + what-if)        [branch policy: required]
+#  main ─► Build (images tagged with git SHA, pushed once, promoted unchanged)
+#       ─► Dev  (auto)  ─► QA (approval: QA lead) ─► Prod (approval: CAB + Compliance, business hours)
+#
+# Every environment deploy = Bicep infra (idempotent, pinned to live image) + scripted blue/green
+# revision release with smoke test and canary; rollback is a traffic shift (scripts/aca-rollback.sh).
+# Approvals/checks (manual approval, business-hours, required template) live on the ADO Environments
+# "pfa-dev", "pfa-qa", "pfa-prod" — not in this file — so they can't be bypassed by editing YAML.
+
+trigger:
+  branches: { include: [main] }
+  paths: { exclude: [docs/*, README.md] }
+
+pr:
+  branches: { include: [main] }
+
+variables:
+  - group: pfa-shared # ACR name, service connection names (no secrets)
+  - name: imageTag
+    value: $(Build.SourceVersion)
+  - name: acrLoginServer
+    value: $(acrName).azurecr.io
+
+stages:
+  # ───────────────────────────────────────────────────────────────── Validate
+  - stage: Validate
+    jobs:
+      - job: backend
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - task: UsePythonVersion@0
+            inputs: { versionSpec: "3.12" }
+          - script: |
+              cd backend
+              pip install -r requirements-dev.txt
+              ruff check .
+              ruff format --check .
+              pytest --junitxml=$(Build.ArtifactStagingDirectory)/backend-tests.xml
+            displayName: Lint + tests (backend)
+          - task: PublishTestResults@2
+            condition: always()
+            inputs: { testResultsFiles: "$(Build.ArtifactStagingDirectory)/backend-tests.xml", testRunTitle: backend }
+
+      - job: frontend
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - task: NodeTool@0
+            inputs: { versionSpec: "22.x" }
+          - script: |
+              cd frontend
+              npm ci --no-audit --no-fund
+              npm run typecheck
+              npm test
+              npm run build
+            displayName: Typecheck + tests + build (frontend)
+
+      - job: infra
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - task: AzureCLI@2
+            displayName: Bicep build + what-if (dev)
+            inputs:
+              azureSubscription: $(serviceConnectionDev)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az bicep build --file infra/main.bicep
+                IMAGE_TAG=$(imageTag) az deployment group what-if \
+                  -g $(rgDev) --template-file infra/main.bicep --parameters infra/main.dev.bicepparam
+
+  # ───────────────────────────────────────────────────────────────── Build
+  - stage: Build
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: images
+        pool: { vmImage: ubuntu-latest }
+        steps:
+          - task: AzureCLI@2
+            displayName: Build & push images (ACR build, tagged by SHA)
+            inputs:
+              azureSubscription: $(serviceConnectionDev)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az acr build -r $(acrName) -t pfa-api:$(imageTag) --target runtime backend
+                az acr build -r $(acrName) -t pfa-web:$(imageTag) frontend
+          - task: AzureCLI@2
+            displayName: Image vulnerability gate (Trivy, fail on CRITICAL)
+            inputs:
+              azureSubscription: $(serviceConnectionDev)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                az acr login -n $(acrName)
+                curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+                for img in pfa-api pfa-web; do
+                  trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress $(acrLoginServer)/$img:$(imageTag)
+                done
+
+  # ───────────────────────────────────────────────────────────────── Deploy (template per env)
+  - template: templates/deploy-env.yml
+    parameters:
+      envName: dev
+      dependsOn: Build
+      serviceConnection: $(serviceConnectionDev)
+      resourceGroup: $(rgDev)
+      canarySeconds: 0
+
+  - template: templates/deploy-env.yml
+    parameters:
+      envName: qa
+      dependsOn: Deploy_dev
+      serviceConnection: $(serviceConnectionQa)
+      resourceGroup: $(rgQa)
+      canarySeconds: 120
+
+  - template: templates/deploy-env.yml
+    parameters:
+      envName: prod
+      dependsOn: Deploy_qa
+      serviceConnection: $(serviceConnectionProd)
+      resourceGroup: $(rgProd)
+      canarySeconds: 600

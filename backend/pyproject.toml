@@ -1,0 +1,23 @@
+[project]
+name = "pharma-field-assist"
+version = "1.4.0"
+requires-python = ">=3.11"
+description = "Governed multi-agent field-sales assistant (demo)"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF"]
+ignore = ["S101", "B008", "RUF001", "RUF002", "RUF003", "S105", "S106"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "B017"]
