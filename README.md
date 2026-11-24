@@ -15,6 +15,51 @@ The model is reachable **only through an Azure API Management AI gateway**. That
 
 > All products (Cardivex, Respira HFA), HCPs and sales figures are fictional. The Graph, Salesforce and Fabric clients run live when configured (see [`docs/LIVE_SETUP.md`](docs/LIVE_SETUP.md)); with nothing configured, each one runs in mock mode.
 
+## Start here
+
+| If you are… | Read |
+| --- | --- |
+| A Chief AI Officer, executive or governance board | [Executive brief](docs/EXECUTIVE_BRIEF.md): the decision, controls, risk register, cost model, KPIs, operating model, roadmap |
+| A principal or enterprise architect | [Architecture design](docs/ARCHITECTURE.md): drivers and quality scenarios, C4 views, runtime sequences, data and security architecture, STRIDE threat model, failure modes, capacity model, 12 ADRs, target state |
+| An engineer or operator | This README, the [runbook](docs/RUNBOOK.md) and [live setup](docs/LIVE_SETUP.md) |
+
+## At a glance
+
+| | |
+| --- | --- |
+| **Business outcome** | Faster, compliant answers for field reps; off-label and adverse-event handling that never depends on a model's judgement |
+| **Governance** | Controls mapped to the NIST AI RMF (Govern, Map, Measure, Manage); versioned compliance policy; tamper-evident audit of every turn |
+| **Cost control** | One AI gateway: 400 output tokens per call, 20K tokens/min, 500K/day, 5M/month; answer cache; budget alerts |
+| **Security** | Entra ID; On-Behalf-Of for user data; managed identities, no keys; internal-only API; Key Vault |
+| **Resilience** | Circuit breakers and deterministic fallbacks: model outages degrade to approved-content answers, never errors |
+| **Verified live on Azure** | Answer served through the gateway with keys disabled (426 prompt / 71 completion tokens); unauthorised gateway call rejected with 401; smoke tests on every release |
+| **Quality** | 206 backend + 7 frontend tests; ruff and TypeScript clean |
+
+## Screenshots
+
+Live on Azure Container Apps, with every model call going through the API Management gateway.
+
+**A grounded answer with its full agent trace.** Routed by the model (confidence 0.95), answered only from MLR-approved content with a citation, Important Safety Information appended by CMP-103, every compliance verdict shown, and the turn written to the audit chain.
+
+![Grounded product answer with agent trace, compliance verdicts and audit record](docs/images/02-grounded-answer-agent-trace.png)
+
+**Compliance view of the audit log.** The hash chain is verified, and every turn is recorded with its actor, route, answer, citations and versions.
+
+![Compliance audit log with verified hash chain and full turn record](docs/images/03-compliance-audit-log.png)
+
+**Platform operations.** Shows the environment, the release version, the model path (`azure-openai via APIM gateway: gpt-4.1-mini`), answer-cache hits, and circuit-breaker state and fault injection per dependency. It also shows the knowledge base with an expired document excluded by MLR gating.
+
+![Platform ops: model via APIM gateway, dependency breakers, knowledge base with expired content excluded](docs/images/04-platform-ops-knowledge-base.png)
+
+<details>
+<summary>More screens: home and district-manager view</summary>
+
+![Field assistant home with persona switch and suggested questions](docs/images/01-field-assistant-home.png)
+
+![District manager persona with district-wide scope](docs/images/05-district-manager-platform-ops.png)
+
+</details>
+
 ---
 
 ## Contents
